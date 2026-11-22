@@ -105,7 +105,16 @@ const b64uEnc=s=>btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replac
 const b64uDec=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return decodeURIComponent(escape(atob(s)))};
 let VIEW=null; try{const m=location.hash.match(/^#r=(.+)$/);if(m)VIEW=JSON.parse(b64uDec(m[1]))}catch(e){VIEW={__bad:1}}
 const isHttp=/^https?:$/.test(location.protocol)&&!/claude\.(ai|site)|claudeusercontent/.test(location.host);
-function viewLink(){const d={};for(const k in A)if(k!=='__step')d[k]=A[k];if(LOGO)d.__logo=LOGO.name;d.__t=new Date().toISOString();return location.origin+location.pathname+'#r='+b64uEnc(JSON.stringify(d))}
+const MAIL='https://formsubmit.co/ajax/office@feinal.co.il';
+async function mailAnswers(){
+ if(!isHttp)return;
+ const body=summaryText();const sig=body.length+':'+body.slice(-40);if(A.__sent===sig)return;
+ const rows={};body.split('\n').slice(2).forEach(l=>{const i=l.indexOf(': ');if(i>0)rows[l.slice(0,i)]=l.slice(i+2)});
+ const data=Object.assign({_subject:'שאלון היכרות חדש: '+(A.biz||A.name||'לקוח'),_template:'table',_captcha:'false'},rows,{'צפייה מלאה':viewLink()});
+ try{const r=await fetch(MAIL,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(data)});
+  if(r.ok){A.__sent=sig;save();const m=document.getElementById('mailOk');if(m)m.hidden=false}}catch(e){}
+}
+function viewLink(){const d={};for(const k in A)if(k!=='__step'&&k!=='__sent')d[k]=A[k];if(LOGO)d.__logo=LOGO.name;d.__t=new Date().toISOString();return location.origin+location.pathname+'#r='+b64uEnc(JSON.stringify(d))}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(A))}catch(e){}};
 let LOGO=null; // {name,type,data(dataURL)}
 try{const l=localStorage.getItem(KEY+'-logo');if(l)LOGO=JSON.parse(l)}catch(e){}
@@ -163,10 +172,12 @@ function render(){
   ${LOGO?`<button type="button" class="btn wide" id="shareLogo">שליחת הלוגו לשני</button>`:''}
   <button type="button" class="btn mint wide" id="copy">העתקת התשובות</button>
   <p class="sub" style="margin:0;font-size:.88rem">אם ההודעה לא נפתחה, העתיקו את התשובות והדביקו אותן בוואטסאפ למספר 054-8461074. אפשר גם לצרף שם תמונות של המקום, וקובץ DWG אם יש.</p>
+  <p class="sub" id="mailOk" hidden style="margin:0;font-size:.88rem">✓ התשובות נשלחו גם במייל לשני.</p>
   <div class="summary" id="sum">${esc(txt)}</div>
   <div class="nav"><button type="button" class="btn ghost" id="back">חזרה לעריכה</button></div></div>`;
   document.getElementById('cheer').textContent='';
   document.getElementById('copy').onclick=()=>{const t=summaryText();const done=()=>{document.getElementById('copy').textContent='הועתק ✓'};try{navigator.clipboard.writeText(t).then(done,()=>selectSum())}catch(e){selectSum()}};
+  mailAnswers();
   const sl=document.getElementById('shareLogo');
   if(sl)sl.onclick=async()=>{const f=logoFile();
    try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'הלוגו של '+(A.biz||'העסק')});sl.textContent='הלוגו נשלח ✓';return}}catch(e){if(e&&e.name==='AbortError')return}
